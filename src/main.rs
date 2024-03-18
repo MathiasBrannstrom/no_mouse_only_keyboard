@@ -1,77 +1,102 @@
-use std::{borrow::Borrow, collections::HashMap, hash::Hash, process, sync::Arc, thread::sleep, time::Duration};
+use std::{collections::HashMap, hash::Hash, process, thread::sleep, time::Duration};
 
 use inputbot::{KeybdKey::{self, *}, MouseButton, MouseCursor};
 
 #[derive(Eq, PartialEq, Hash)]
 enum Action {
-    MouseMoveUp,
-    MouseMoveDown,
-    MouseMoveLeft,
-    MouseMoveRight,
+    MouseMove(Direction),
+    MouseClick(MouseButton),
+    SpeedUp,
+    SpeedDown
+}
 
-    // MouseLeftClick,
+#[derive(Eq, PartialEq, Hash, Copy, Clone)]
+enum Direction {
+    Up,
+    Down,
+    Left,
+    Right
+}
+
+impl Direction {
+    pub fn iter() -> impl Iterator<Item = Direction> {
+        [Direction::Up, Direction::Down, Direction::Left, Direction::Right].iter().copied()
+    }
+
+    pub fn into_i32s(&self) -> (i32, i32) {
+        match self {
+            Direction::Up => (0, -1),
+            Direction::Down => (0, 1),
+            Direction::Left => (-1, 0),
+            Direction::Right => (1, 0)
+        }
+    }
 }
 
 fn main() {
     
-    let speed_arc = Arc::new(3);
+    
 
     let mut keybinds = HashMap::new();
 
-    keybinds.insert(F13Key, Action::MouseMoveUp);
-    keybinds.insert(F14Key, Action::MouseMoveLeft);
-    keybinds.insert(F15Key, Action::MouseMoveDown);
-    keybinds.insert(F23Key, Action::MouseMoveRight);
+    keybinds.insert(Action::MouseMove(Direction::Up), F13Key);
+    keybinds.insert(Action::MouseMove(Direction::Left), F14Key);
+    keybinds.insert(Action::MouseMove(Direction::Down), F15Key);
+    keybinds.insert(Action::MouseMove(Direction::Right), F23Key);
+    keybinds.insert(Action::SpeedUp, F22Key);
+    keybinds.insert(Action::SpeedDown, F21Key);
 
-    start_loop(&keybinds, speed_arc)
+
+    start_loop(&keybinds)
 
 }
 
-fn start_loop(keybinds: &HashMap<KeybdKey, Action>, speed_arc: Arc<i32>) {
+fn start_loop(keybinds: &HashMap<Action, KeybdKey>) {
 
-    let actions = create_actions_hashmap(speed_arc);
+    const FAST_SPEED:i32 = 10;
+    const SLOW_SPEED:i32 = 1;
+    const DEFAULT_SPEED:i32 = 3;
+
+    let mut speed_arc;
+
+
     loop {
+        speed_arc = DEFAULT_SPEED;
         
         if F10Key.is_pressed() {
             process::exit(0);
         }
-        for (key, mouse_move) in keybinds {
-            if key.is_pressed() {
-                if let Some(action) = actions.get(mouse_move) {
-                    action();
+
+        match keybinds.get(&Action::SpeedUp) {
+            Some(key) => {
+                if key.is_pressed() {
+                    speed_arc = FAST_SPEED;
                 }
-                
+            },
+            None => { }
+        }
+
+        match keybinds.get(&Action::SpeedDown) {
+            Some(key) => {
+                if key.is_pressed() {
+                    speed_arc = SLOW_SPEED;
+                }
+            },
+            None => { }
+        }
+
+        for direction in Direction::iter() {
+            match keybinds.get(&Action::MouseMove(direction)) {
+                Some(key) => {
+                    if key.is_pressed() {
+                        let (x,y) = direction.into_i32s();
+                        MouseCursor::move_rel(x*speed_arc , y*speed_arc);
+                    }
+                },
+                None => { }
             }
         }
 
         sleep(Duration::from_millis(10))
     }
 }
-
-fn create_actions_hashmap(speed_arc: Arc<i32>) -> HashMap<Action, Box<dyn Fn()>> {
-    let mut actions: HashMap<Action, Box<dyn Fn()>> = HashMap::new();
-
-    let speed_clone = speed_arc.clone();
-    actions.insert(Action::MouseMoveUp, Box::new(move || MouseCursor::move_rel(0, -*speed_clone)));
-    
-    let speed_clone = speed_arc.clone();
-     actions.insert(Action::MouseMoveLeft, Box::new(move || MouseCursor::move_rel( -*speed_clone, 0)));
-    
-     let speed_clone = speed_arc.clone();
-    actions.insert(Action::MouseMoveDown, Box::new(move || MouseCursor::move_rel(0, *speed_clone)));
-    
-    let speed_clone = speed_arc.clone();
-    actions.insert(Action::MouseMoveRight, Box::new(move || MouseCursor::move_rel(*speed_clone, 0)));
-
-    // actions.insert(Action::MouseLeftClick, Box::new(|| {
-    //     MouseButton::LeftButton.press();
-    //     MouseButton::LeftButton.release();
-    // }
-    // ));
-    
-    actions
-}
-
-// fn setup_action(actions_map: &mut HashMap<Action, Box<dyn Fn()>>, action:Action, closure: Box<dyn Fn()>, speed_arc: Arc<i32>) {
-//     actions_map.insert(action, v)
-// }
