@@ -1,56 +1,34 @@
-use std::{collections::HashMap, hash::Hash, process, thread::sleep, time::Duration};
-
+use std::{collections::HashMap, process, thread::sleep, time::Duration};
 use inputbot::{KeybdKey::{self, *}, MouseButton, MouseCursor, MouseWheel};
 
-#[derive(Eq, PartialEq, Hash, Clone, Copy)]
-enum Action {
-    MouseMove(Direction),
-    MouseClick(MouseButton),
-    MouseScroll(Direction),
-    SpeedUp,
-    SpeedDown
+extern crate native_windows_gui as nwg;
+extern crate native_windows_derive as nwd;
+
+mod data;
+use data::{Action, Direction};
+
+mod grid_navigation {
+    pub mod ui;
 }
 
-#[derive(Eq, PartialEq, Hash, Copy, Clone)]
-enum Direction {
-    Up,
-    Down,
-    Left,
-    Right
-}
-
-impl Direction {
-    pub fn iter() -> impl Iterator<Item = Direction> {
-        [Direction::Up, Direction::Down, Direction::Left, Direction::Right].iter().copied()
-    }
-
-    pub fn into_i32s(&self) -> (i32, i32) {
-        match self {
-            Direction::Up => (0, -1),
-            Direction::Down => (0, 1),
-            Direction::Left => (-1, 0),
-            Direction::Right => (1, 0)
-        }
-    }
-}
+use grid_navigation::ui::BasicApp;
 
 fn main() {
-    
-    
 
-    let mut keybinds = HashMap::new();
 
-    keybinds.insert(Action::MouseMove(Direction::Up), F13Key);
-    keybinds.insert(Action::MouseMove(Direction::Left), F14Key);
-    keybinds.insert(Action::MouseMove(Direction::Down), F15Key);
-    keybinds.insert(Action::MouseMove(Direction::Right), F23Key);
-    keybinds.insert(Action::SpeedUp, F21Key);
-    keybinds.insert(Action::SpeedDown, F22Key);
-    keybinds.insert(Action::MouseClick(MouseButton::LeftButton), F17Key);
-    keybinds.insert(Action::MouseClick(MouseButton::RightButton), F18Key);
-    keybinds.insert(Action::MouseScroll(Direction::Up), F19Key);
-    keybinds.insert(Action::MouseScroll(Direction::Down), F20Key);
-
+    let keybinds = vec![
+        (Action::MouseMove(Direction::Up), F13Key),
+        (Action::MouseMove(Direction::Left), F14Key),
+        (Action::MouseMove(Direction::Down), F15Key),
+        (Action::MouseMove(Direction::Right), F23Key),
+        (Action::SpeedUp, F21Key),
+        (Action::SpeedDown, F22Key),
+        (Action::MouseClick(MouseButton::LeftButton), F17Key),
+        (Action::MouseClick(MouseButton::RightButton), F18Key),
+        (Action::MouseScroll(Direction::Up), F19Key),
+        (Action::MouseScroll(Direction::Down), F20Key),
+        (Action::ShowGridNavigation, F24Key)
+    ].into_iter().collect::<HashMap<Action, KeybdKey>>();
 
     start_loop(&keybinds);
 }
@@ -65,15 +43,16 @@ fn start_loop(keybinds: &HashMap<Action, KeybdKey>) {
     const SLOW_SCROLL_SPEED:i32 = 1;
     const DEFAULT_SCROLL_SPEED:i32 = 2;
 
-
     let mut mouse_speed;
     let mut scroll_speed;
 
-    let mut mouse_click_state: HashMap<MouseButton, bool> = HashMap::from([
-        (MouseButton::LeftButton, false),
+    let mut mouse_click_state: HashMap<MouseButton, bool> = HashMap::from([ // Should technically be initialized to button state.
+        (MouseButton::LeftButton, false), 
         (MouseButton::MiddleButton, false),
         (MouseButton::RightButton, false)]
     );
+
+    let mut show_grid_navigation_button_pressed = false; // Should be initialized to button state.
 
     loop {
         mouse_speed = DEFAULT_MOUSE_SPEED;
@@ -136,8 +115,33 @@ fn start_loop(keybinds: &HashMap<Action, KeybdKey>) {
             }
         }
 
+        update_grid_navigation_state(&mut show_grid_navigation_button_pressed, &keybinds);
+
         sleep(Duration::from_millis(5))
     }
+}
+
+fn update_grid_navigation_state(show_grid_navigation_button_pressed: &mut bool, keybinds: &HashMap<Action, KeybdKey>) {
+    match keybinds.get(&Action::ShowGridNavigation) {
+        Some(key) => {
+            if key.is_pressed() {
+                if !*show_grid_navigation_button_pressed {
+                    
+                    show_grid_navigation_ui();
+                }
+                *show_grid_navigation_button_pressed = true;
+            } else {
+                *show_grid_navigation_button_pressed = false;
+            }
+        },
+        None => todo!(),
+    }
+}
+
+
+fn show_grid_navigation_ui() {
+    
+    BasicApp::show_app();
 }
 
 fn update_mouse_state(button: MouseButton, keybinds: &HashMap<Action, KeybdKey>, mouse_button_states: &mut HashMap<MouseButton, bool>) {
